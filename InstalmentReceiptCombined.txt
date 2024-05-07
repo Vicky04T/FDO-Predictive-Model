@@ -1,0 +1,73 @@
+import pandas as pd
+
+# Read the data into DataFrames
+# installments = pd.DataFrame({
+#     'Enrol_No': [1, 1, 2, 2, 3, 3, 3, 3,4,4],
+#     'Instalments': [1, 2, 1, 2, 1, 2, 3, 4,1,2],
+#     'Instal_Date': ['01/01/2023', '01/02/2023', '15/01/2023', '15/02/2023', '01/01/2023', '01/02/2023', '01/03/2023', '01/04/2023'
+#                          ,'01/03/2023', '01/04/2023']
+# })
+
+# receipts = pd.DataFrame({
+#     'Enrol_No': [1, 1, 1, 1, 2, 2, 3, 3],
+#     'Receipt': [1, 2, 3, 4, 1, 2, 1, 2],
+#     'Receipt_Date': ['15/01/2023', '28/02/2023', '31/03/2023', '30/04/2023', '31/01/2023', '28/02/2023', '15/01/2023', '15/02/2023']
+# })
+
+# installments = pd.read_excel('Arena_Instalments.xlsx')
+
+installments = pd.read_excel('/content/Arena_Instalments-2021.xlsx')
+
+
+
+
+# receipts=pd.read_excel('Arena_Receipts.xlsx')
+receipts=pd.read_excel('/content/Arena_Receipts-2021.xlsx')
+
+# Convert date columns to datetime objects
+installments['Instal_Date'] = pd.to_datetime(installments['Instal_Date'], format='%d/%m/%Y')
+receipts['Receipt_Date'] = pd.to_datetime(receipts['Receipt_Date'], format='%d/%m/%Y')
+
+# Function to process each user's data
+def process_user_data(Enrol_No, inst_df, receipt_df):
+    user_inst = inst_df[inst_df['Enrol_No'] == Enrol_No].copy()
+    user_receipt = receipt_df[receipt_df['Enrol_No'] == Enrol_No].copy()
+
+    # Left join if number of installments is greater, else right join
+    if len(user_inst) >= len(user_receipt):
+        merged = user_inst.merge(user_receipt, how='left', left_on='Instal_No', right_on='Receipt_No')
+    else:
+        merged = user_inst.merge(user_receipt, how='right', left_on='Instal_No', right_on='Receipt_No')
+
+    # Fill missing values with -1
+    merged['Instal_No'].fillna(-1, inplace=True)
+    merged['Receipt_No'].fillna(-1, inplace=True)
+
+    # Fill missing dates with previous date
+    merged['Instal_Date'].fillna(method='ffill', inplace=True)
+    merged['Receipt_Date'].fillna(method='ffill', inplace=True)
+
+    # Fill NaN values in 'Receipt_amount' and 'Instalment_amount' with 0
+    merged['Receipt_Amount'].fillna(0, inplace=True)
+    merged['Instal_Amount'].fillna(0, inplace=True)
+
+    # Generate 'Receipt_Date' for missing values by adding one year to 'Instal_Date'
+    merged.loc[merged['Receipt_Date'].isna(), 'Receipt_Date'] = merged.loc[merged['Receipt_Date'].isna(), 'Instal_Date'] + pd.DateOffset(years=1)
+
+
+    # Drop redundant 'Enrol_No' column and replace NaN with correct Enrol_No
+    merged.drop(columns=['Enrol_No_y'], inplace=True)
+    merged.rename(columns={'Enrol_No_x': 'Enrol_No'}, inplace=True)
+    merged['Enrol_No'] = Enrol_No
+
+    merged.to_excel('/content/Merged.xlsx',index=False)
+
+    return merged
+
+# Process data for each user
+result = pd.concat([process_user_data(Enrol_No, installments, receipts) for Enrol_No in installments['Enrol_No'].unique()], ignore_index=True)
+
+print(result)
+
+
+# replace the receipt and installment DF
